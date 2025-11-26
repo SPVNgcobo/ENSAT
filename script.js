@@ -20,6 +20,9 @@ const Utils = {
       const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  },
+  isValidEmail: (email) => {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 };
 
@@ -132,8 +135,8 @@ const DataService = {
     }
     if(!localStorage.getItem('ensInventory')){
       localStorage.setItem('ensInventory', JSON.stringify([
-        { tag:'ENS-L-001', type:'Laptop', model:'Dell Latitude 7420', user:'System', status:'Available', searchStr:'ens-l-001 laptop dell latitude 7420 system available' },
-        { tag:'ENS-M-102', type:'Mobile', model:'iPhone 13', user:'Sarah Connor', status:'Assigned', searchStr:'ens-m-102 mobile iphone 13 sarah connor assigned' }
+        { tag:'ENS-L-001', type:'Laptop', model:'Dell Latitude 7420', user:'System', status:'Available', notes:'Brand new stock', searchStr:'ens-l-001 laptop dell latitude 7420 system available brand new stock' },
+        { tag:'ENS-M-102', type:'Mobile', model:'iPhone 13', user:'Sarah Connor', status:'Assigned', notes:'Screen protector applied', searchStr:'ens-m-102 mobile iphone 13 sarah connor assigned screen protector applied' }
       ]));
     }
     if(!localStorage.getItem('ensActivity')) localStorage.setItem('ensActivity', JSON.stringify([]));
@@ -145,7 +148,7 @@ const DataService = {
   updateInv: (tag, data) => {
     let inv = DataService.get('ensInventory');
     const idx = inv.findIndex(i => i.tag === tag);
-    const sStr = ( (data.tag||inv[idx]?.tag||tag) + ' ' + (data.type||inv[idx]?.type||'') + ' ' + (data.model||inv[idx]?.model||'') + ' ' + (data.user||inv[idx]?.user||'') + ' ' + (data.status||inv[idx]?.status||'') ).toLowerCase();
+    const sStr = ( (data.tag||inv[idx]?.tag||tag) + ' ' + (data.type||inv[idx]?.type||'') + ' ' + (data.model||inv[idx]?.model||'') + ' ' + (data.user||inv[idx]?.user||'') + ' ' + (data.status||inv[idx]?.status||'') + ' ' + (data.notes||inv[idx]?.notes||'') ).toLowerCase();
     data.searchStr = sStr;
     if(idx > -1) inv[idx] = { ...inv[idx], ...data };
     else inv.push({ tag, ...data });
@@ -209,7 +212,8 @@ const DataService = {
                               type: row.Type || row.type || 'Unknown',
                               model: row.Model || row.model || 'Unknown',
                               user: row.User || row.user || '',
-                              status: row.Status || row.status || 'Available'
+                              status: row.Status || row.status || 'Available',
+                              notes: row.Notes || row.notes || ''
                           });
                           count++;
                       }
@@ -314,6 +318,8 @@ const UI = {
     if(view==='dashboard') UI.renderDashboard();
     if(view==='inventory') UI.renderInventory();
     if(view==='history') UI.renderHistory();
+    // NEW: Initialize issuance details when opening the view
+    if(view==='issuance') Workflow.initIssuance(); 
   },
 
   toggleSidebar: () => document.getElementById('sidebar').classList.toggle('active'),
@@ -502,6 +508,7 @@ const UI = {
       document.getElementById('mod-model').value = item.model || '';
       document.getElementById('mod-status').value = item.status || 'Available';
       document.getElementById('mod-user').value = item.user || '';
+      document.getElementById('mod-notes').value = item.notes || '';
       
       btnDel.style.display = 'inline-flex';
       btnClone.style.display = 'inline-flex';
@@ -537,6 +544,7 @@ const UI = {
       const type = document.getElementById('mod-type').value;
       const model = document.getElementById('mod-model').value;
       const status = document.getElementById('mod-status').value;
+      const notes = document.getElementById('mod-notes').value;
       
       UI.closeModal('assetModal');
       
@@ -546,6 +554,7 @@ const UI = {
           document.getElementById('mod-type').value = type;
           document.getElementById('mod-model').value = model;
           document.getElementById('mod-status').value = status;
+          document.getElementById('mod-notes').value = notes;
           UI.toast('Cloning asset... Enter new Tag ID.', 'info');
       }, 300);
   },
@@ -597,7 +606,8 @@ const UI = {
       type: document.getElementById('mod-type').value,
       model: document.getElementById('mod-model').value,
       status: document.getElementById('mod-status').value,
-      user: document.getElementById('mod-user').value
+      user: document.getElementById('mod-user').value,
+      notes: document.getElementById('mod-notes').value
     };
     
     DataService.updateInv(tag, data);
@@ -626,11 +636,34 @@ const Workflow = {
   ctx: null,
   activeAsset: null,
 
+  initIssuance: () => {
+      // Get current user
+      const user = JSON.parse(localStorage.getItem('ensCurrentUser') || '{}');
+      // Get current date
+      const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      
+      // Fill fields
+      const issuerField = document.getElementById('iss-by-user');
+      const dateField = document.getElementById('iss-date');
+      
+      if(issuerField) issuerField.value = user.name || 'System Admin';
+      if(dateField) dateField.value = date;
+  },
+
   nextStep: (n) => {
-    if(n === 2 && !document.getElementById('iss-name').value) {
-        UI.toast('Please enter a Full Name', 'error');
-        document.getElementById('iss-name').focus();
-        return;
+    if(n === 2) {
+        const name = document.getElementById('iss-name').value;
+        const email = document.getElementById('iss-email').value;
+        if(!name) {
+            UI.toast('Please enter a Full Name', 'error');
+            document.getElementById('iss-name').focus();
+            return;
+        }
+        if(!email || !Utils.isValidEmail(email)) {
+            UI.toast('Please enter a valid Email Address', 'error');
+            document.getElementById('iss-email').focus();
+            return;
+        }
     }
     
     document.querySelectorAll('[id^="form-step-"]').forEach(el=>el.style.display='none');
@@ -812,13 +845,19 @@ const Workflow = {
 
     const step1 = document.getElementById('form-step-1');
     const step2 = document.getElementById('form-step-2');
+    const pdfHeader = document.getElementById('pdf-header');
     
     // Temporarily show all steps for PDF
     const s1d = step1.style.display; const s2d = step2.style.display;
     step1.style.display = 'block'; step2.style.display = 'block';
-    const btns = document.querySelectorAll('#issuance-card button');
-    btns.forEach(b => b.style.display = 'none');
+    pdfHeader.style.display = 'block';
+    document.getElementById('pdf-ref-code').innerText = `IS-${Date.now().toString().slice(-6)}`;
     
+    const btns = document.querySelectorAll('#issuance-card button');
+    const prog = document.querySelector('.progress-bar-container');
+    btns.forEach(b => b.style.display = 'none');
+    if(prog) prog.style.display = 'none';
+
     const node = document.getElementById('issuance-card');
     const opt = { margin:15, filename:`ENS_Issue_${tag}_${Date.now()}.pdf`, image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'} };
 
@@ -830,7 +869,9 @@ const Workflow = {
       UI.toast('Issuance complete. PDF downloaded.', 'success');
       
       step1.style.display = s1d; step2.style.display = s2d;
+      pdfHeader.style.display = 'none';
       btns.forEach(b => b.style.display = '');
+      if(prog) prog.style.display = 'flex';
 
       setTimeout(() => {
            UI.switchView('dashboard');
