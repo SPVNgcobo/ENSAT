@@ -1,4 +1,3 @@
-/* ---------- UTILS ---------- */
 const Utils = {
   escape: (str) => str ? String(str).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' })[m]) : '',
   debounce: (func, wait=300) => {
@@ -26,7 +25,6 @@ const Utils = {
   }
 };
 
-/* ---------- APP CORE ---------- */
 const App = {
   isSignup:false,
   init: () => {
@@ -126,7 +124,6 @@ const App = {
   }
 };
 
-/* ---------- DATA SERVICE ---------- */
 const DataService = {
   init: async () => {
     if(!localStorage.getItem('ensUsers')){
@@ -181,7 +178,6 @@ const DataService = {
     link.remove();
   },
 
-  // FULL SYSTEM BACKUP - For Restore functionality
   backupJSON: () => {
       const fullState = {
           ensInventory: DataService.get('ensInventory'),
@@ -263,8 +259,6 @@ const DataService = {
   }
 };
 
-
-/* ---------- UI CONTROLLER ---------- */
 const UI = {
   pg:1, limit:10, sort:{col:null,asc:true},
 
@@ -352,7 +346,6 @@ const UI = {
         `).join('');
     }
 
-    // Chart
     const counts = {};
     (inv||[]).forEach(i => counts[i.type] = (counts[i.type]||0) + 1);
     const isDark = document.body.classList.contains('dark-mode');
@@ -425,7 +418,6 @@ const UI = {
       return matchSearch && matchFilter;
     });
 
-    // sorting
     if(UI.sort.col){
       data.sort((a,b)=>{
         let va = a[UI.sort.col] || '';
@@ -460,7 +452,6 @@ const UI = {
         emptyState.style.display = 'none';
         const frag = document.createDocumentFragment();
         
-        // Highlighter helper
         const h = (txt) => {
             if(!search) return Utils.escape(txt);
             const regex = new RegExp(`(${search})`, 'gi');
@@ -516,7 +507,6 @@ const UI = {
       btnDel.style.display = 'inline-flex';
       btnClone.style.display = 'inline-flex';
       
-      // NEW: Check for contract data
       if(item.contract && item.contract.signature) {
           btnContract.style.display = 'inline-flex';
           // Store the tag on the button for easy access
@@ -599,7 +589,6 @@ const UI = {
       document.getElementById('con-initials').innerText = c.initials || '';
       document.getElementById('con-sig-img').src = c.signature; // Load the saved image
 
-      // Show Modal
       const modal = document.getElementById('contractModal');
       modal.style.display = 'flex';
       setTimeout(()=>modal.classList.add('open'), 10);
@@ -688,8 +677,6 @@ const UI = {
   }
 };
 
-
-/* ---------- WORKFLOW ---------- */
 const Workflow = {
   currentStep: 1,
   ctx: null,
@@ -784,7 +771,6 @@ const Workflow = {
               display.style.borderColor = 'var(--success)';
           }
 
-          // Fill Data
           if(mode === 'iss'){
               document.getElementById('iss-lbl-tag').innerText = found.tag;
               document.getElementById('iss-lbl-model').innerText = found.model;
@@ -1024,5 +1010,5 @@ const Workflow = {
   }
 };
 
-/* ---------- START ---------- */
 document.addEventListener('DOMContentLoaded', App.init);
+
