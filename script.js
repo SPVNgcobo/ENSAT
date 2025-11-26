@@ -148,8 +148,10 @@ const DataService = {
   updateInv: (tag, data) => {
     let inv = DataService.get('ensInventory');
     const idx = inv.findIndex(i => i.tag === tag);
+    // Be careful not to overwrite the searchStr if not needed, but here we rebuild it to include notes
     const sStr = ( (data.tag||inv[idx]?.tag||tag) + ' ' + (data.type||inv[idx]?.type||'') + ' ' + (data.model||inv[idx]?.model||'') + ' ' + (data.user||inv[idx]?.user||'') + ' ' + (data.status||inv[idx]?.status||'') + ' ' + (data.notes||inv[idx]?.notes||'') ).toLowerCase();
     data.searchStr = sStr;
+    
     if(idx > -1) inv[idx] = { ...inv[idx], ...data };
     else inv.push({ tag, ...data });
     DataService.set('ensInventory', inv);
@@ -169,7 +171,7 @@ const DataService = {
 
   // INVENTORY ONLY - For Excel/Reporting
   exportCSV: () => {
-    const data = DataService.get('ensInventory').map(({searchStr, ...rest}) => rest); // Exclude searchStr
+    const data = DataService.get('ensInventory').map(({searchStr, contract, ...rest}) => rest); // Exclude large objects
     const csv = Papa.unparse(data);
     const link = document.createElement('a');
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
@@ -498,6 +500,7 @@ const UI = {
     
     const btnDel = document.getElementById('btn-delete-asset');
     const btnClone = document.getElementById('btn-clone-asset');
+    const btnContract = document.getElementById('btn-view-contract');
 
     if(mode === 'edit'){
       document.getElementById('modal-title').innerText = `Edit ${tag}`;
@@ -512,6 +515,15 @@ const UI = {
       
       btnDel.style.display = 'inline-flex';
       btnClone.style.display = 'inline-flex';
+      
+      // NEW: Check for contract data
+      if(item.contract && item.contract.signature) {
+          btnContract.style.display = 'inline-flex';
+          // Store the tag on the button for easy access
+          btnContract.dataset.tag = tag;
+      } else {
+          btnContract.style.display = 'none';
+      }
       
       // Show History
       historyBox.style.display = 'block';
@@ -533,6 +545,7 @@ const UI = {
       document.getElementById('mod-tag').disabled = false;
       btnDel.style.display = 'none';
       btnClone.style.display = 'none';
+      btnContract.style.display = 'none';
       historyBox.style.display = 'none';
     }
     modal.style.display = 'flex';
@@ -557,6 +570,52 @@ const UI = {
           document.getElementById('mod-notes').value = notes;
           UI.toast('Cloning asset... Enter new Tag ID.', 'info');
       }, 300);
+  },
+  
+  viewContract: () => {
+      // Get tag from the button we setup in openModal
+      const tag = document.getElementById('btn-view-contract').dataset.tag;
+      const item = DataService.get('ensInventory').find(i => i.tag === tag);
+      
+      if(!item || !item.contract) {
+          UI.toast('No contract found for this asset', 'error');
+          return;
+      }
+
+      const c = item.contract;
+
+      // Populate the Paper View
+      document.getElementById('con-ref').innerText = c.ref || 'N/A';
+      document.getElementById('con-issuer').innerText = c.issuer || 'System';
+      document.getElementById('con-date').innerText = c.issueDate || '';
+      
+      document.getElementById('con-name').innerText = item.user;
+      document.getElementById('con-email').innerText = c.recipientEmail || '';
+      
+      document.getElementById('con-tag').innerText = item.tag;
+      document.getElementById('con-model').innerText = item.model;
+      document.getElementById('con-type').innerText = item.type;
+      
+      document.getElementById('con-initials').innerText = c.initials || '';
+      document.getElementById('con-sig-img').src = c.signature; // Load the saved image
+
+      // Show Modal
+      const modal = document.getElementById('contractModal');
+      modal.style.display = 'flex';
+      setTimeout(()=>modal.classList.add('open'), 10);
+  },
+
+  downloadContractPDF: () => {
+      const node = document.getElementById('contract-paper');
+      const tag = document.getElementById('con-tag').innerText;
+      const opt = { 
+          margin: 10, 
+          filename: `Contract_${tag}.pdf`, 
+          image: { type: 'jpeg', quality: 0.98 }, 
+          html2canvas: { scale: 2 }, 
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
+      };
+      html2pdf().set(opt).from(node).save();
   },
   
   openProfileModal: () => {
@@ -831,8 +890,17 @@ const Workflow = {
   completeIssuance: (event) => {
     const tag = (document.getElementById('iss-tag').value || '').trim();
     const name = (document.getElementById('iss-name').value || '').trim();
+    const email = (document.getElementById('iss-email').value || '').trim(); // Capture email
     const init = (document.getElementById('iss-initials').value || '').trim();
     
+    // 1. Capture Signature Data URL
+    const canvas = document.getElementById('sig-canvas');
+    const sigData = canvas.toDataURL(); // This creates a base64 string of the image
+
+    // 2. Capture Issuer Details
+    const issuer = document.getElementById('iss-by-user').value;
+    const date = document.getElementById('iss-date').value;
+
     if(!init) { UI.toast('Please enter initials', 'error'); return; }
     
     if(Workflow.activeAsset && Workflow.activeAsset.status === 'Assigned') {
@@ -863,7 +931,20 @@ const Workflow = {
 
     html2pdf().set(opt).from(node).save().then(()=>{
       if(tag){ 
-          DataService.updateInv(tag, { user: name, status: 'Assigned' }); 
+          // 3. UPDATE INVENTORY WITH CONTRACT DATA
+          DataService.updateInv(tag, { 
+              user: name, 
+              status: 'Assigned',
+              // SAVE CONTRACT DATA HERE:
+              contract: {
+                  issuer: issuer,
+                  issueDate: date,
+                  recipientEmail: email,
+                  initials: init,
+                  signature: sigData, // The image string
+                  ref: `IS-${Date.now().toString().slice(-6)}`
+              }
+          }); 
           DataService.log('Issuance', `Issued ${tag} to ${name}`, JSON.parse(localStorage.getItem('ensCurrentUser')||'{}').name || 'System'); 
       }
       UI.toast('Issuance complete. PDF downloaded.', 'success');
