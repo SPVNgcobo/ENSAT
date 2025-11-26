@@ -189,4 +189,4 @@ body.dark-mode .st-maint { color: #FFD666; }
     .view-section { display: none; }
     .active-view { display: block !important; opacity: 1 !important; transform: none !important; }
     #view-history table { font-size: 10px; }
-}
+                 }
