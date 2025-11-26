@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>ENSAT | Enterprise Asset Tracker v4.0</title>
+  <title>ENSAT | Enterprise Asset Tracker v4.1</title>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -80,7 +80,7 @@
       </div>
 
       <div class="sidebar-footer">
-          ENSAT v4.0 | <span style="opacity:0.6">Lite</span>
+          ENSAT v4.1 | <span style="opacity:0.6">Lite</span>
       </div>
     </div>
     <div class="mobile-overlay" onclick="UI.toggleSidebar()"></div>
@@ -409,6 +409,8 @@
           <div style="display:flex;gap:10px">
               <button type="button" class="btn btn-secondary" style="color:var(--danger);border-color:rgba(255,72,66,0.3);display:none" id="btn-delete-asset" onclick="UI.deleteAsset()"><i class="fas fa-trash"></i></button>
               <button type="button" class="btn btn-secondary" style="color:var(--info);border-color:rgba(24,144,255,0.3);display:none" id="btn-clone-asset" title="Clone Asset" onclick="UI.cloneAsset()"><i class="fas fa-copy"></i> Copy</button>
+              
+              <button type="button" class="btn btn-secondary" style="color:#000;border-color:var(--primary-yellow);background:rgba(255,210,0,0.1);display:none" id="btn-view-contract" onclick="UI.viewContract()"><i class="fas fa-file-contract"></i> View Contract</button>
           </div>
           <div style="display:flex;gap:12px;margin-left:auto">
             <button type="button" class="btn btn-ghost" onclick="UI.closeModal('assetModal')">Cancel</button>
@@ -443,8 +445,68 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="contractModal">
+    <div class="modal" style="max-width:700px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:15px;">
+        <h3 style="margin:0">Signed Asset Contract</h3>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" onclick="UI.downloadContractPDF()"><i class="fas fa-download"></i> Download PDF</button>
+          <button class="btn btn-ghost" onclick="UI.closeModal('contractModal')"><i class="fas fa-times"></i></button>
+        </div>
+      </div>
+
+      <div id="contract-paper" style="padding:40px;border:1px solid #eee;box-shadow:0 0 10px rgba(0,0,0,0.05);background:#fff;">
+          
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;border-bottom:2px solid #000;padding-bottom:15px;">
+              <img src="https://dummyimage.com/150x50/000000/FFD200.png&text=ENSafrica" style="height:40px;">
+              <div style="text-align:right;font-size:10px;color:#555;">
+                  <strong>IT ASSET HANDOVER FORM</strong><br>
+                  Ref: <span id="con-ref"></span>
+              </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px;font-size:13px;">
+              <div>
+                  <h4 style="text-transform:uppercase;font-size:11px;color:#999;margin-bottom:10px;">Issuer Details</h4>
+                  <p><strong>Issued By:</strong> <span id="con-issuer"></span></p>
+                  <p><strong>Date:</strong> <span id="con-date"></span></p>
+              </div>
+              <div>
+                  <h4 style="text-transform:uppercase;font-size:11px;color:#999;margin-bottom:10px;">Recipient Details</h4>
+                  <p><strong>Name:</strong> <span id="con-name"></span></p>
+                  <p><strong>Email:</strong> <span id="con-email"></span></p>
+              </div>
+          </div>
+
+          <div style="background:#f9f9f9;border:1px solid #ddd;padding:15px;border-radius:6px;margin-bottom:30px;">
+              <h4 style="margin:0 0 10px 0;font-size:14px;">Asset Details</h4>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;font-size:13px;">
+                  <div><span>Tag:</span> <strong id="con-tag"></strong></div>
+                  <div><span>Model:</span> <strong id="con-model"></strong></div>
+                  <div><span>Type:</span> <strong id="con-type"></strong></div>
+              </div>
+          </div>
+
+          <div style="font-size:11px;color:#666;margin-bottom:30px;line-height:1.5;text-align:justify;">
+              I, the undersigned, acknowledge receipt of the above asset. I understand that this device remains the property of the company and agree to adhere to the Acceptable Use Policy. I will return this asset upon request or termination of employment.
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+              <div>
+                  <span style="font-size:11px;color:#999;display:block;margin-bottom:4px;">Initials</span>
+                  <div id="con-initials" style="font-family:monospace;font-size:16px;font-weight:700;border:1px solid #ccc;padding:8px 12px;display:inline-block;"></div>
+              </div>
+              <div style="text-align:right;">
+                  <span style="font-size:11px;color:#999;display:block;margin-bottom:4px;">Digital Signature</span>
+                  <img id="con-sig-img" src="" style="max-height:60px;border-bottom:1px solid #000;">
+              </div>
+          </div>
+      </div>
+    </div>
+  </div>
+
   <div id="toastContainer" style="position:fixed;right:24px;bottom:24px;z-index:1300;display:flex;flex-direction:column;align-items:flex-end"></div>
 
   <script src="script.js"></script>
 </body>
-</html>
+  </html>
